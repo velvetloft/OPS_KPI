@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OPS KPI Dashboard</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to report</a>
+
+<div id="loading" class="screen">
+  <div class="screen-inner">
+    <div class="pulse" aria-hidden="true"></div>
+    <p>Loading KPI data</p>
+  </div>
+</div>
+
+<div id="error" class="screen" hidden>
+  <div class="screen-inner">
+    <h1>No data to show</h1>
+    <p id="error-detail"></p>
+    <div class="screen-help">
+      <p>The dashboard reads <code>data/ops_kpi_data.json</code>, which
+         <code>OPS_KPI.py</code> writes at the end of a successful run.</p>
+      <ol>
+        <li>Run <code>python OPS_KPI.py</code> and check it ends with
+            &ldquo;JSON refreshed&rdquo;.</li>
+        <li>Serve the project folder:
+            <code>python -m http.server 8000</code></li>
+        <li>Open <code>http://localhost:8000/dashboard/</code> — opening
+            index.html straight from disk blocks the file read.</li>
+      </ol>
+    </div>
+    <button type="button" id="retry">Try again</button>
+  </div>
+</div>
+
+<div id="app" hidden>
+
+  <nav class="rail" aria-label="Reports">
+    <div class="rail-head">
+      <p class="rail-product">OPS KPI</p>
+      <p class="rail-sub">Store operations review</p>
+    </div>
+    <ul id="report-list" class="rail-list"></ul>
+    <div class="rail-foot">
+      <p id="refresh-line"></p>
+      <p id="exclusion-line"></p>
+    </div>
+  </nav>
+
+  <main id="main">
+
+    <header class="head">
+      <div>
+        <h1 id="report-title">&nbsp;</h1>
+        <p id="report-desc" class="head-desc">&nbsp;</p>
+      </div>
+      <dl class="head-meta">
+        <div><dt>Reporting date</dt><dd id="meta-date">&mdash;</dd></div>
+        <div><dt>Last refresh</dt><dd id="meta-refresh">&mdash;</dd></div>
+        <div><dt>Status</dt><dd id="meta-status" class="status-chip">&mdash;</dd></div>
+      </dl>
+    </header>
+
+    <section class="summary" aria-labelledby="summary-h">
+      <h2 id="summary-h">MINISO overall</h2>
+      <div id="summary-cards" class="summary-grid"></div>
+      <p id="summary-note" class="note"></p>
+    </section>
+
+    <section class="controls" aria-label="Filters">
+      <div class="control period-control">
+        <span class="control-label" id="period-label">Period</span>
+        <div id="granularity" class="seg" role="tablist" aria-labelledby="period-label"></div>
+        <div id="periods" class="chips" role="group" aria-label="Reporting period"></div>
+      </div>
+
+      <div class="control-row">
+        <label class="control">
+          <span class="control-label" for="search">Store</span>
+          <input type="search" id="search" placeholder="Code or name" autocomplete="off">
+        </label>
+        <label class="control">
+          <span class="control-label" for="spoc">SPoC</span>
+          <select id="spoc"></select>
+        </label>
+        <label class="control">
+          <span class="control-label" for="rowtype">Rows</span>
+          <select id="rowtype">
+            <option value="store">Stores only</option>
+            <option value="spoc_total">SPoC totals only</option>
+            <option value="all" selected>Stores and totals</option>
+          </select>
+        </label>
+        <label class="control control-check">
+          <input type="checkbox" id="only-below">
+          <span>Below target only</span>
+        </label>
+        <button type="button" id="reset" class="ghost">Clear filters</button>
+      </div>
+    </section>
+
+    <section class="table-block" aria-labelledby="table-h">
+      <div class="block-head">
+        <h2 id="table-h">Store detail</h2>
+        <p id="table-count" class="note"></p>
+        <button type="button" id="fullscreen-toggle" class="ghost">Full screen</button>
+      </div>
+      <div class="table-scroll">
+        <table id="table">
+          <thead><tr id="thead-row"></tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+      <div id="empty" class="empty" hidden>
+        <p>No rows match these filters.</p>
+        <button type="button" class="ghost" id="empty-reset">Clear filters</button>
+      </div>
+      <div class="pager">
+        <button type="button" id="prev" class="ghost">Previous</button>
+        <span id="page-info"></span>
+        <button type="button" id="next" class="ghost">Next</button>
+        <label class="page-size">
+          <span>Rows</span>
+          <select id="page-size">
+            <option>25</option><option selected>50</option>
+            <option>100</option><option value="0">All</option>
+          </select>
+        </label>
+      </div>
+    </section>
+
+    <footer class="foot">
+      <p id="foot-source"></p>
+    </footer>
+
+  </main>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

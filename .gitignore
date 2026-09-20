@@ -1,0 +1,18 @@
+# Credentials -- never commit
+.env
+*.env
+!.env.example
+
+# Generated KPI data
+data/*.json
+.ops_kpi_data_*.json.tmp
+
+# Excel output
+*.xlsx
+~$*.xlsx
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
