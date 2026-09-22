@@ -168,7 +168,7 @@ reports = [
         "target_column": "target_abv",
         "achievement_basis": None,
         "folder": "abv",
-        "file": "abv_19_sep.xlsx",
+        "file": "abv_22_sep.xlsx",
         "query": f"""
         WITH store_spoc AS (
     -- Authoritative store universe: every store with a SPOC/target
@@ -640,7 +640,7 @@ ORDER BY
         "target_column": "target_upt",
         "achievement_basis": None,
         "folder": "upt",
-        "file": "upt_19_sep.xlsx",
+        "file": "upt_22_sep.xlsx",
         "query": f"""
     WITH store_spoc AS (
     SELECT DISTINCT
@@ -1095,7 +1095,7 @@ ORDER BY
         "target_column": None,
         "achievement_basis": None,
         "folder": "sales",
-        "file": "sales_19_sep.xlsx",
+        "file": "sales_22_sep.xlsx",
         "query": f"""
         WITH store_spoc AS (
     SELECT DISTINCT
@@ -1149,6 +1149,23 @@ SELECT
     spoc_name,
     GROUPING(spoc_name)  AS grp_spoc,
     GROUPING(store_code) AS grp_store,
+
+        /* =========================
+       MONTH-TO-DATE (MTD) SALES
+       From the 1st of the current month through yesterday
+       (today excluded — still an incomplete day)
+    ========================= */
+
+    ROUND(
+        SUM(
+            CASE
+                WHEN dt >= date_trunc('month', CURRENT_DATE)::date
+                 AND dt < CURRENT_DATE
+                THEN sales
+            END
+        ),
+        2
+    ) AS mtd_sales,
 
     /* =========================
        LAST 7 COMPLETED DAYS
@@ -1286,6 +1303,8 @@ SELECT
         ELSE s.spoc_name
     END AS spoc_name,
 
+    s.mtd_sales,
+
     s.day_1_sales,
     s.day_2_sales,
     s.day_3_sales,
@@ -1326,7 +1345,7 @@ ORDER BY
         "target_column": None,
         "achievement_basis": None,
         "folder": "noh",
-        "file": "noh_19_sep.xlsx",
+        "file": "noh_22_sep.xlsx",
         "query": f"""
 WITH store_spoc AS (
     SELECT DISTINCT
@@ -1582,7 +1601,7 @@ ORDER BY
         "target_column": None,
         "achievement_basis": 100,
         "folder": "sales_ach",
-        "file": "sales_ach_19_sep.xlsx",
+        "file": "sales_ach_22_sep.xlsx",
         "query": f"""
          WITH store_spoc AS (
     SELECT DISTINCT
