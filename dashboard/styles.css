@@ -183,7 +183,8 @@ code {
 
 main {
   height: 100vh;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
   padding: 12px var(--gap) 12px;
   display: flex; flex-direction: column; gap: 10px;
   min-width: 0;
@@ -314,7 +315,7 @@ main {
 
 .table-scroll {
   margin-top: 6px; overflow: auto;
-  flex: 1 1 auto; min-height: 0;
+  flex: 1 1 auto; min-height: 320px;
   border: 1px solid var(--rule-soft); border-radius: 4px;
 }
 table { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 12.5px; }
@@ -417,4 +418,416 @@ tr.is-spoc-total .flag-bad::before { background: var(--bad); }
   padding: 16px 20px;
   background: var(--surface);
 }
+/* Full screen shows every filtered row at once (app.js skips
+   pagination while this class is present) using denser rows so the
+   full ~25-30 row dataset realistically fits without a vertical
+   scrollbar. overflow-y stays auto rather than hidden as a safety net
+   only -- so an unusually large result set scrolls instead of losing
+   rows, but normally never needs to. */
+.table-block.is-fullscreen .table-scroll {
+  overflow-y: auto;
+  overflow-x: auto;
+}
+.table-block.is-fullscreen .pager { display: none; }
+.table-block.is-fullscreen thead th {
+  padding: 5px 9px;
+  font-size: 10.5px;
+}
+.table-block.is-fullscreen tbody td {
+  padding: 3px 9px;
+}
 body.has-fullscreen-table { overflow: hidden; }
+
+/* ---------- premium depth & elevation (additive only -- no existing
+   rule is removed or restructured; this layers surfaces, light and
+   shadow on top of the existing theme and colors) ---------- */
+
+body {
+  background:
+    radial-gradient(1100px 700px at 12% -8%, rgba(162, 123, 91, 0.07), transparent 62%),
+    var(--canvas);
+}
+
+/* Sidebar: layered dark surface, active item physically raised */
+.rail {
+  background: linear-gradient(180deg, #333e41 0%, var(--ink) 55%, #23282a 100%);
+  box-shadow: 3px 0 26px rgba(0, 0, 0, 0.30), inset -1px 0 0 rgba(255, 255, 255, 0.04);
+}
+.rail-item { transition: box-shadow .15s ease, transform .12s ease, background .15s ease; }
+.rail-item:hover { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05); }
+.rail-item[aria-current="true"] {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  transform: translateX(1px);
+}
+
+/* Executive header bar */
+.head {
+  background: linear-gradient(155deg, #34403f, var(--ink) 62%);
+  box-shadow:
+    0 12px 28px rgba(0, 0, 0, 0.24),
+    0 2px 6px rgba(0, 0, 0, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+/* MINISO OVERALL: the strongest surface on the page, with its own
+   raised inner cards -- the "layered panels inside a bigger elevated
+   surface" look */
+.summary {
+  background: linear-gradient(165deg, #4a5a5e, var(--charcoal) 60%);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow:
+    0 20px 42px rgba(0, 0, 0, 0.26),
+    0 5px 12px rgba(0, 0, 0, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+.summary .card {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.02));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 5px 12px rgba(0, 0, 0, 0.22);
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.summary .card:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 10px 22px rgba(0, 0, 0, 0.32);
+}
+
+/* Filter toolbar: raised light panel */
+.controls {
+  background: linear-gradient(180deg, #ffffff, #fbfaf7);
+  border-color: rgba(0, 0, 0, 0.07);
+  box-shadow:
+    0 10px 24px rgba(44, 54, 57, 0.09),
+    0 2px 5px rgba(44, 54, 57, 0.06),
+    inset 0 1px 0 #ffffff;
+}
+.control input[type="search"], .control select {
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.06);
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.control input[type="search"]:focus-visible, .control select:focus-visible {
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.06), 0 0 0 3px rgba(162, 123, 91, 0.2);
+}
+.seg { box-shadow: 0 3px 8px rgba(0, 0, 0, 0.09), inset 0 1px 0 #ffffff; }
+.seg button[aria-selected="true"] {
+  background: linear-gradient(180deg, #26302f, var(--ink));
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.4);
+}
+.chip {
+  background: linear-gradient(180deg, #ffffff, #f8f7f3);
+  box-shadow: inset 0 1px 0 #ffffff, 0 3px 7px rgba(0, 0, 0, 0.07);
+  transition: box-shadow .15s ease, transform .1s ease;
+}
+.chip:hover { box-shadow: inset 0 1px 0 #ffffff, 0 5px 12px rgba(0, 0, 0, 0.12); transform: translateY(-1px); }
+.chip[aria-pressed="true"] {
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.18), 0 4px 10px rgba(162, 123, 91, 0.4);
+}
+
+/* Buttons: raised at rest, higher on hover, pressed-in on click */
+.ghost, #retry {
+  background: linear-gradient(180deg, #ffffff, #f6f5f2);
+  box-shadow: inset 0 1px 0 #ffffff, 0 3px 7px rgba(0, 0, 0, 0.09);
+  transition: box-shadow .15s ease, border-color .15s ease, transform .12s ease;
+}
+.ghost:hover, #retry:hover {
+  box-shadow: inset 0 1px 0 #ffffff, 0 7px 16px rgba(0, 0, 0, 0.16);
+  transform: translateY(-1.5px);
+}
+.ghost:active, #retry:active {
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.2);
+  transform: translateY(0);
+}
+.ghost[disabled] { box-shadow: none; transform: none; background: var(--surface); }
+
+/* Table container: elevated executive surface with a dimensional,
+   physically-separated header */
+.table-block {
+  background: linear-gradient(180deg, #ffffff, #fdfcfa);
+  border-color: rgba(0, 0, 0, 0.08);
+  box-shadow:
+    0 18px 38px rgba(44, 54, 57, 0.12),
+    0 3px 8px rgba(44, 54, 57, 0.07),
+    inset 0 1px 0 #ffffff;
+}
+thead th {
+  background: linear-gradient(180deg, #313c3f, var(--ink));
+  box-shadow: 0 4px 10px -4px rgba(0, 0, 0, 0.45);
+}
+
+/* SPoC totals: slightly raised above ordinary store rows */
+tr.is-spoc-total td {
+  background: linear-gradient(180deg, #f3ebdf, var(--gold-soft));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 3px 6px -3px rgba(0, 0, 0, 0.16);
+}
+.row-tag {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+
+/* MINISO total: the executive grand total -- strongest elevation of
+   any row in the table */
+tr.is-miniso td {
+  background: linear-gradient(180deg, #38464a, var(--ink) 65%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 10px 22px rgba(0, 0, 0, 0.4);
+}
+
+/* Full screen: a "control room" surface, distinct from the browser
+   chrome around it, still with a dimensional header */
+.table-block.is-fullscreen {
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.06),
+    inset 0 12px 26px -20px rgba(0, 0, 0, 0.45);
+}
+.table-block.is-fullscreen thead th {
+  box-shadow: 0 5px 12px -5px rgba(0, 0, 0, 0.5);
+}
+
+/* =================================================================
+   v2 changes: themes, table borders, header colours, frozen Store
+   name column, layout overlap fix.  Appended last so it layers over
+   the rules above without removing them.
+   ================================================================= */
+
+/* ---------- theme tokens (Light = existing look) ---------- */
+:root {
+  --text: var(--ink);
+  --grid: #D9D4C8;              /* subtle cell borders */
+  --grid-head: rgba(255, 255, 255, 0.16);
+  --hover: #F7F6F3;
+  --surface-grad: #FDFCFA;
+  --controls-grad: #FBFAF7;
+  --chip-grad: #F8F7F3;
+  --total-a: #F3EBDF;
+  --sticky-shadow: 5px 0 6px -4px rgba(44, 54, 57, 0.28);
+
+  /* Day / Week / Month header colours (muted, on-palette) */
+  --hd-base:  #2C3639;          /* Store / Store name / Target */
+  --hd-day:   #3F5559;          /* slate teal   */
+  --hd-week:  #7A5C43;          /* deep brûlée  */
+  --hd-month: #465A70;          /* muted slate blue */
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --text: #E8E4DA;
+  --ink: #171D20;
+  --charcoal: #222C30;
+  --ink-2: #AEAAA0;
+  --ink-3: #8E939A;
+  --canvas: #0F1417;
+  --surface: #182024;
+  --rule: #2F3B40;
+  --rule-soft: #263035;
+  --gold: #B58B67;
+  --gold-soft: #3A3024;
+  --gold-dark: #F0E4D0;
+  --good: #3FBE8B;
+  --bad: #F2685F;
+  --warn: #E0AC4F;
+  --grid: #2E3A3F;
+  --grid-head: rgba(255, 255, 255, 0.12);
+  --hover: #1F292E;
+  --surface-grad: #161E22;
+  --controls-grad: #1A2327;
+  --chip-grad: #1E282C;
+  --total-a: #43372A;
+  --sticky-shadow: 5px 0 8px -4px rgba(0, 0, 0, 0.7);
+  --hd-base:  #1F292D;
+  --hd-day:   #2E4448;
+  --hd-week:  #5F4A38;
+  --hd-month: #37475A;
+}
+
+html, body { color: var(--text); }
+
+/* surfaces that had hard-coded light gradients now follow the theme */
+.controls   { background: linear-gradient(180deg, var(--surface), var(--controls-grad)); }
+.chip, .ghost, #retry { background: linear-gradient(180deg, var(--surface), var(--chip-grad)); }
+.ghost[disabled] { background: var(--surface); }
+.table-block { background: linear-gradient(180deg, var(--surface), var(--surface-grad)); }
+.table-block.is-fullscreen { background: var(--surface); }
+
+/* ---------- dark-only structural surfaces ---------- */
+html[data-theme="dark"] body {
+  background: radial-gradient(1100px 700px at 12% -8%, rgba(181, 139, 103, 0.06), transparent 62%), var(--canvas);
+}
+html[data-theme="dark"] .rail {
+  background: linear-gradient(180deg, #141A1D 0%, #0F1417 55%, #0B0F11 100%);
+  box-shadow: 3px 0 22px rgba(0, 0, 0, 0.5), inset -1px 0 0 rgba(255, 255, 255, 0.05);
+}
+html[data-theme="dark"] .rail-mark { background: linear-gradient(155deg, #DCD7C9, #A27B5B 55%, #6B4E36); }
+html[data-theme="dark"] .head {
+  background: linear-gradient(155deg, #212B2F, #171D20 62%);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+html[data-theme="dark"] .summary {
+  background: linear-gradient(165deg, #2B383C, #222C30 60%);
+  border-color: rgba(255, 255, 255, 0.07);
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+html[data-theme="dark"] .controls,
+html[data-theme="dark"] .table-block {
+  border-color: var(--rule);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+html[data-theme="dark"] .table-block.is-fullscreen { box-shadow: none; }
+html[data-theme="dark"] .seg,
+html[data-theme="dark"] .chip,
+html[data-theme="dark"] .ghost,
+html[data-theme="dark"] #retry { box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4); }
+html[data-theme="dark"] .chip:hover,
+html[data-theme="dark"] .ghost:hover,
+html[data-theme="dark"] #retry:hover { box-shadow: 0 6px 14px rgba(0, 0, 0, 0.5); }
+html[data-theme="dark"] .chip[aria-pressed="true"] {
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.35), 0 3px 8px rgba(181, 139, 103, 0.3);
+}
+html[data-theme="dark"] .seg button[aria-selected="true"] {
+  background: linear-gradient(180deg, #BE946F, #9C7754);
+  color: #fff;
+}
+html[data-theme="dark"] .control input[type="search"],
+html[data-theme="dark"] .control select,
+html[data-theme="dark"] .page-size select { background: #131A1D; color: var(--text); }
+html[data-theme="dark"] tr.is-miniso .row-tag { background: var(--gold); }
+html[data-theme="dark"] tbody td.is-selected { background: rgba(181, 139, 103, 0.13); }
+html[data-theme="dark"] tbody tr:hover td.is-selected { background: rgba(181, 139, 103, 0.2); }
+html[data-theme="dark"] .status-chip { color: var(--good-on-dark); }
+
+/* ---------- #9 layout: no overlap between title / source / table ----------
+   Root cause: .table-block was allowed to shrink (flex:1, min-height:0)
+   below its own content, so the table, pager and scrollbar spilled out
+   of it and painted over the source/footer line. It now sizes to its
+   content; the table scrolls inside its own capped box instead. */
+main { gap: 12px; padding-bottom: 16px; }
+.table-block {
+  flex: 0 0 auto;
+  min-height: auto;
+  position: relative;
+  overflow: visible;
+}
+.block-head {
+  align-items: center;
+  row-gap: 4px;
+  margin-bottom: 6px;
+  position: relative;
+}
+.block-head > * { min-width: 0; }
+.table-scroll {
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: max(360px, calc(100vh - 300px));
+  margin-top: 0;
+  border: 1px solid var(--grid);
+  position: relative;
+}
+.pager { position: relative; margin-top: 10px; }
+.foot {
+  position: relative;
+  z-index: 0;
+  margin-top: 2px;
+  padding: 2px 2px 0;
+  overflow-wrap: anywhere;
+}
+.table-block.is-fullscreen {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.table-block.is-fullscreen .table-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+}
+
+/* ---------- #1 borders (both themes) ---------- */
+thead th {
+  color: rgba(240, 236, 226, 0.9);
+  background: var(--hd-base);
+  border-right: 1px solid var(--grid-head);
+  border-bottom: 1px solid var(--grid-head);
+}
+tbody td {
+  border-right: 1px solid var(--grid);
+  border-bottom: 1px solid var(--grid);
+}
+thead th:last-child, tbody td:last-child { border-right: 0; }
+tr.is-spoc-total td { border-right-color: rgba(162, 123, 91, 0.4); }
+tr.is-miniso td {
+  border-right: 1px solid rgba(255, 255, 255, 0.14);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+}
+tr.is-miniso td:last-child { border-right: 0; }
+tr.is-spoc-total td { background: linear-gradient(180deg, var(--total-a), var(--gold-soft)); }
+tbody tr:hover td { background: var(--hover); }
+
+/* ---------- #2 Day / Week / Month header colours ---------- */
+thead th.g-day   { background: var(--hd-day); }
+thead th.g-week  { background: var(--hd-week); }
+thead th.g-month { background: var(--hd-month); }
+thead th.is-selected { color: #fff; }
+
+/* ---------- #4 / #5 Store code scrolls, Store name is frozen ---------- */
+th.col-code, td.col-code {
+  width: 56px;
+  min-width: 56px;
+  max-width: 68px;
+  padding-left: 8px;
+  padding-right: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+th.col-name, td.col-name { min-width: 190px; }
+
+th.sticky-col, td.sticky-col {
+  position: sticky;
+  left: 0;
+  border-right: 1px solid var(--grid);
+}
+tbody td.sticky-col {
+  z-index: 2;
+  background: var(--surface);
+  box-shadow: var(--sticky-shadow);
+}
+thead th.sticky-col {
+  z-index: 4;
+  background: var(--hd-base);
+  box-shadow: var(--sticky-shadow);
+}
+thead th.col-code { z-index: 2; }
+tbody tr:hover td.sticky-col { background: var(--hover); }
+
+/* keep the total-row accent on the first (scrolling) cell, not mid-row */
+tr.is-spoc-total td.sticky-col { border-left: 0; background: var(--gold-soft); }
+tr.is-miniso td.sticky-col     { border-left: 0; background: var(--ink); }
+tr.is-spoc-total td.col-code   { border-left: 3px solid var(--gold); }
+tr.is-miniso td.col-code       { border-left: 3px solid var(--gold); }
+html[data-theme="dark"] tr.is-miniso td.sticky-col { background: #222C30; }
+html[data-theme="dark"] tr.is-miniso td { background: linear-gradient(180deg, #2B383C, #222C30 65%); }
+
+/* ---------- #6 theme switch ---------- */
+.theme-switch {
+  display: inline-flex;
+  align-self: center;
+  border: 1px solid rgba(220, 215, 201, 0.28);
+  border-radius: 5px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.06);
+}
+.theme-switch button {
+  background: transparent;
+  border: 0;
+  padding: 5px 12px;
+  font-size: 12.5px;
+  cursor: pointer;
+  color: rgba(240, 236, 226, 0.75);
+}
+.theme-switch button + button { border-left: 1px solid rgba(220, 215, 201, 0.2); }
+.theme-switch button:hover { color: #fff; }
+.theme-switch button[aria-pressed="true"] {
+  background: var(--gold);
+  color: #fff;
+  font-weight: 600;
+}
+.theme-switch.is-floating { position: fixed; top: 10px; right: 14px; z-index: 60; background: var(--ink); }

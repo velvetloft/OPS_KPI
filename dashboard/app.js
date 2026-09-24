@@ -4,6 +4,16 @@
  * no thresholds beyond the targets the source data already carries.
  */
 
+/* Apply the saved theme immediately so there is no flash of the wrong theme. */
+(function () {
+  try {
+    var t = localStorage.getItem("opsKpiTheme");
+    document.documentElement.setAttribute("data-theme", t === "dark" ? "dark" : "light");
+  } catch (e) {
+    document.documentElement.setAttribute("data-theme", "light");
+  }
+})();
+
 (function () {
   "use strict";
 
@@ -29,36 +39,32 @@
   /* ---------------- number formatting ---------------- */
 
   var nf = {
-    decimal2: new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
     decimal1: new Intl.NumberFormat("en-IN", { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
-    currency0: new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 }),
-    plain: new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2 })
+    int: new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 })
   };
 
-  function formatValue(value, format) {
+  function isUptReport(rep) {
+    return Boolean(rep) && (/\bupt\b/i.test(String(rep.name || "")) ||
+      /\bupt\b/i.test(String(rep._key || "")));
+  }
+
+  /* Display formatting only -- underlying values are never changed.
+     UPT: exactly 1 decimal (max 1). Everything else: whole numbers,
+     Indian digit grouping, no rupee symbol. Percent KPIs keep "%". */
+  function formatValue(value, format, rep) {
     if (value === null || value === undefined) return null;
     if (typeof value !== "number") return String(value);
-    switch (format) {
-      case "currency0": return "\u20B9" + nf.currency0.format(value);
-      case "decimal2": return nf.decimal2.format(value);
-      case "decimal1": return nf.decimal1.format(value);
-      case "percent2": return nf.decimal2.format(value) + "%";
-      default: return nf.plain.format(value);
-    }
+    if (!isFinite(value)) return null;
+    rep = rep || (state.payload && state.reportKey ? report() : null);
+    if (isUptReport(rep)) return nf.decimal1.format(value);
+    var text = nf.int.format(value);
+    if (text === "-0") text = "0";
+    return /^percent/.test(format || "") ? text + "%" : text;
   }
 
-  function compactCurrency(value) {
-    if (value === null || value === undefined) return null;
-    var abs = Math.abs(value);
-    if (abs >= 1e7) return "\u20B9" + nf.decimal2.format(value / 1e7) + " Cr";
-    if (abs >= 1e5) return "\u20B9" + nf.decimal2.format(value / 1e5) + " L";
-    return "\u20B9" + nf.currency0.format(value);
-  }
-
-  function railValue(report, value) {
+  function railValue(rep, value) {
     if (value === null || value === undefined) return "\u2014";
-    if (report.value_format === "currency0") return compactCurrency(value);
-    return formatValue(value, report.value_format);
+    return formatValue(value, rep.value_format, rep);
   }
 
   /* ---------------- data helpers ---------------- */
@@ -70,8 +76,8 @@
   }
 
   var HEADER_OVERRIDES = {
-    store_code: "Store code",
-    store_name: "Store",
+    store_code: "Store",
+    store_name: "Store name",
     spoc_name: "SPoC"
   };
 
@@ -140,6 +146,70 @@
       (rep.achievement_basis !== null && rep.achievement_basis !== undefined);
   }
 
+  /* Frontend-only: never render a column labelled as a "D-1" /
+     "previous day" concept, whatever KPI it belongs to. */
+  function isD1Label(text) {
+    return /\bd-?1\b/i.test(text) || /previous\s*day/i.test(text);
+  }
+
+  function granularityOf(rep, key) {
+    var gs = ["day", "week", "month"];
+    for (var i = 0; i < gs.length; i++) {
+      var list = rep.periods && rep.periods[gs[i]];
+      if (list && list.some(function (p) { return p.key === key; })) return gs[i];
+    }
+    return null;
+  }
+
+  function isBlank(v) {
+    return v === null || v === undefined || v === "" || (typeof v === "number" && isNaN(v));
+  }
+
+  /* #7: a store row is hidden only when EVERY displayed metric column
+     is empty. One blank date never hides a store. All-zero rows are
+     also treated as empty, except for reports where zero is a real,
+     good answer (Negative Stock / lower-is-better). */
+  function isEmptyStoreRow(rep, row) {
+    if (row._row_type !== "store") return false;
+    var cols = rep.columns.filter(function (c) {
+      return c.role === "metric" && !isD1Label(c.label) && !isD1Label(c.key);
+    });
+    if (!cols.length) return false;
+    var zeroIsValid = rep.higher_is_better === false || /negative/i.test(String(rep.name || ""));
+    return cols.every(function (c) {
+      var v = row[c.key];
+      if (isBlank(v)) return true;
+      return !zeroIsValid && typeof v === "number" && v === 0;
+    });
+  }
+
+  /* #8: hide "(No SPoC) - TOTAL" rows. Display only. */
+  var NO_SPOC_RE = /no[\s_\-]*spoc/i;
+  function isNoSpocTotal(row) {
+    if (row._row_type !== "spoc_total") return false;
+    var spoc = row._spoc;
+    if (spoc === null || spoc === undefined || String(spoc).trim() === "") return true;
+    return NO_SPOC_RE.test([spoc, row.store_code, row.store_name].join(" "));
+  }
+
+  /* #4: label for total rows. "Ashish - TOTAL [SPoC total]" -> "Ashish". */
+  function rowLabel(row) {
+    var name = row.store_name, code = row.store_code, raw;
+    if (row._row_type === "miniso_total") {
+      raw = !isBlank(name) ? name : code;
+      return isBlank(raw) ? "" : String(raw);
+    }
+    if (!isBlank(name) && /total/i.test(String(name))) raw = name;
+    else if (!isBlank(code) && /total/i.test(String(code))) raw = code;
+    else raw = !isBlank(name) ? name : (!isBlank(code) ? code : row._spoc);
+    return String(isBlank(raw) ? "" : raw)
+      .replace(/\s*[\[(]\s*SPoC\s*total\s*[\])]\s*$/i, "")
+      .replace(/\s*[-\u2013\u2014:]?\s*SPoC\s*total\s*$/i, "")
+      .replace(/\s*[-\u2013\u2014:]\s*total\s*$/i, "")
+      .replace(/\s+total\s*$/i, "")
+      .trim();
+  }
+
   /* ---------------- filtering ---------------- */
 
   function filteredRows() {
@@ -147,7 +217,8 @@
     var term = state.search.trim().toLowerCase();
 
     return rep.data.filter(function (row) {
-      if (row._row_type === "miniso_total") return false;
+      if (isNoSpocTotal(row)) return false;
+      if (isEmptyStoreRow(rep, row)) return false;
       if (state.rowType !== "all" && row._row_type !== state.rowType) return false;
       if (state.spoc && row._spoc !== state.spoc) return false;
 
@@ -163,6 +234,39 @@
       }
       return true;
     });
+  }
+
+  /* Interleave each SPoC's stores with that SPoC's own total row,
+     immediately after its stores -- matches the source report's
+     hierarchy (SPoC 1 stores, SPoC 1 total, SPoC 2 stores, SPoC 2
+     total, ...), MINISO total last. Only re-groups; never reorders
+     stores relative to each other within their own SPoC. */
+  function groupBySpoc(rows) {
+    var stores = rows.filter(function (r) { return r._row_type === "store"; });
+    var spocTotals = rows.filter(function (r) { return r._row_type === "spoc_total"; });
+    var minisoTotal = rows.filter(function (r) { return r._row_type === "miniso_total"; });
+    if (!spocTotals.length) return rows;
+
+    var order = [], bySpoc = {};
+    stores.forEach(function (r) {
+      var key = r._spoc || "";
+      if (!bySpoc[key]) { bySpoc[key] = []; order.push(key); }
+      bySpoc[key].push(r);
+    });
+    var totalBySpoc = {};
+    spocTotals.forEach(function (r) { totalBySpoc[r._spoc || ""] = r; });
+
+    var out = [];
+    order.forEach(function (key) {
+      out = out.concat(bySpoc[key]);
+      if (totalBySpoc[key]) out.push(totalBySpoc[key]);
+    });
+    // a SPoC total whose stores are all filtered out still shows,
+    // just ahead of the MINISO total rather than vanishing
+    spocTotals.forEach(function (r) {
+      if (order.indexOf(r._spoc || "") === -1) out.push(r);
+    });
+    return out.concat(minisoTotal);
   }
 
   function sortRows(rows) {
@@ -290,6 +394,22 @@
       }
     });
 
+    // If this report's source data already carries a month-to-date
+    // style field (any name containing "mtd" or "month to date"), show
+    // it -- this is read directly from the MINISO row, never computed
+    // here, so it only appears when the Python/JSON output defines it.
+    var mtdCol = rep.columns.filter(function (c) {
+      return c.key !== rep.target_column && /mtd|month.?to.?date/i.test(c.key + " " + c.label);
+    })[0];
+    if (mtdCol) {
+      cards.splice(Math.min(1, cards.length), 0, {
+        label: mtdCol.label,
+        key: mtdCol.key,
+        value: total[mtdCol.key],
+        sub: "Month to date"
+      });
+    }
+
     var selected = columnByKey(rep, state.periodKey);
     var alreadyShown = cards.some(function (c) { return c.key === state.periodKey; });
     if (selected && !alreadyShown) {
@@ -298,8 +418,7 @@
         key: selected.key,
         value: total[selected.key],
         sub: "Selected period"
-      });
-    }
+      });    }
 
     var storeCount = rep.row_counts_by_type.store;
     var spocCount = rep.row_counts_by_type.spoc_total;
@@ -307,7 +426,7 @@
     cards.forEach(function (card) {
       var el = document.createElement("div");
       el.className = "card";
-      var text = formatValue(card.value, rep.value_format);
+      var text = formatValue(card.value, rep.value_format, rep);
 
       // Target / variance / status -- only when the report defines a
       // basis that is actually valid at the MINISO level. ABV/UPT carry
@@ -318,8 +437,8 @@
       if (text !== null && rep.achievement_basis !== null && rep.achievement_basis !== undefined) {
         status = statusFor(rep, total, card.value);
         var variance = card.value - rep.achievement_basis;
-        basisText = "Target " + formatValue(rep.achievement_basis, rep.value_format) +
-          " \u00B7 Variance " + (variance >= 0 ? "+" : "") + formatValue(variance, rep.value_format) +
+        basisText = "Target " + formatValue(rep.achievement_basis, rep.value_format, rep) +
+          " \u00B7 Variance " + (variance >= 0 ? "+" : "") + formatValue(variance, rep.value_format, rep) +
           " \u00B7 " + (status && status.meets ? "Target achieved" : "Below target");
       } else if (rep.target_column) {
         basisText = "Target is store-level only \u2014 not defined for the MINISO total";
@@ -463,18 +582,39 @@
       });
     }
 
+    // #3: SPoC column is never shown (row._spoc still drives
+    // filtering, grouping and totals).
     var visible = rep.columns.filter(function (c) {
-      if (c.key === "spoc_name") return state.rowType === "all" || state.rowType === "store";
+      if (c.key === "spoc_name") return false;
       if (c.role === "metric" && columnIsAllNull(rep, c)) return false;
+      if (isD1Label(c.label) || isD1Label(c.key)) return false;
       return true;
     });
+    // Store code first, Store name second, everything else in source order.
+    var codeCols = visible.filter(function (c) { return c.key === "store_code"; });
+    var nameCols = visible.filter(function (c) { return c.key === "store_name"; });
+    var otherCols = visible.filter(function (c) { return c.key !== "store_code" && c.key !== "store_name"; });
+    visible = codeCols.concat(nameCols, otherCols);
 
-    visible.forEach(function (col, index) {
+    // #5: the frozen column is Store name (falls back to the first
+    // column only if a report has no store_name column).
+    var stickyKey = nameCols.length ? "store_name" : (visible[0] && visible[0].key);
+    var labelKey = nameCols.length ? "store_name" : "store_code";
+
+    visible.forEach(function (col) {
       var th = document.createElement("th");
       th.textContent = headerFor(col);
-      if (headerFor(col) !== col.label) th.title = col.label;
+      if (!HEADER_OVERRIDES[col.key] && col.role !== "target" && headerFor(col) !== col.label) {
+        th.title = col.label;
+      }
       if (col.dtype !== "number") th.classList.add("text");
-      if (index === 0) th.classList.add("sticky-col");
+      if (col.key === "store_code") th.classList.add("col-code");
+      if (col.key === "store_name") th.classList.add("col-name");
+      if (col.key === stickyKey) th.classList.add("sticky-col");
+      if (col.role === "metric") {
+        var g = granularityOf(rep, col.key);   // #2 day / week / month header colour
+        if (g) th.classList.add("g-" + g);
+      }
       if (col.key === state.periodKey) th.classList.add("is-selected");
       th.setAttribute("scope", "col");
       th.tabIndex = 0;
@@ -498,36 +638,49 @@
       headRow.appendChild(th);
     });
 
-    var pageRows = rows;
-    if (state.pageSize > 0) {
+    // Default (unsorted) view: group each SPoC's stores with that
+    // SPoC's own total immediately after them. Clicking a column to
+    // sort intentionally switches to a flat sort across all rows.
+    var ordered = state.sortKey ? rows : groupBySpoc(rows);
+
+    var isFullscreen = document.querySelector(".table-block").classList.contains("is-fullscreen");
+    var pageRows = ordered;
+    if (!isFullscreen && state.pageSize > 0) {
       var start = (state.page - 1) * state.pageSize;
-      pageRows = rows.slice(start, start + state.pageSize);
+      pageRows = ordered.slice(start, start + state.pageSize);
     }
 
     pageRows.forEach(function (row) {
       var tr = document.createElement("tr");
+      var isTotal = row._row_type === "spoc_total" || row._row_type === "miniso_total";
       if (row._row_type === "spoc_total") tr.className = "is-spoc-total";
       if (row._row_type === "miniso_total") tr.className = "is-miniso";
 
-      visible.forEach(function (col, index) {
+      visible.forEach(function (col) {
         var td = document.createElement("td");
-        if (index === 0) td.classList.add("sticky-col");
+        if (col.key === "store_code") td.classList.add("col-code");
+        if (col.key === "store_name") td.classList.add("col-name");
+        if (col.key === stickyKey) td.classList.add("sticky-col");
         if (col.key === state.periodKey) td.classList.add("is-selected");
 
         var value = row[col.key];
         if (col.dtype !== "number") {
           td.classList.add("text");
-          td.textContent = value === null || value === undefined ? "\u2014" : value;
-          if (index === 0 && row._row_type !== "store") {
-            var tag = document.createElement("span");
-            tag.className = "row-tag";
-            tag.textContent = row._row_type === "miniso_total" ? "overall" : "SPoC total";
-            td.appendChild(tag);
+          if (isTotal && (col.key === "store_code" || col.key === "store_name")) {
+            // totals: label lives in the frozen name column, code cell stays empty
+            td.textContent = col.key === labelKey ? rowLabel(row) : "";
+            if (col.key === labelKey && row._row_type === "miniso_total") {
+              var tag = document.createElement("span");
+              tag.className = "row-tag";
+              tag.textContent = "overall";
+              td.appendChild(tag);
+            }
+          } else {
+            td.textContent = value === null || value === undefined ? "\u2014" : value;
+            if (value === null || value === undefined) td.classList.add("null-cell");
           }
-          if (value === null || value === undefined) td.classList.add("null-cell");
         } else {
-          var text = formatValue(value, col.role === "target"
-            ? rep.value_format : rep.value_format);
+          var text = formatValue(value, rep.value_format, rep);
           if (text === null) {
             td.textContent = "\u2014";
             td.classList.add("null-cell");
@@ -561,10 +714,16 @@
         : state.rowType === "spoc_total" ? ", SPoC totals only"
           : ", stores and SPoC totals");
 
-    var pages = state.pageSize > 0 ? Math.max(1, Math.ceil(totalRows / state.pageSize)) : 1;
-    $("page-info").textContent = "Page " + state.page + " of " + pages;
-    $("prev").disabled = state.page <= 1;
-    $("next").disabled = state.page >= pages;
+    // Pagination is bypassed entirely in full screen -- every filtered
+    // row is shown at once, grouped, with no page split.
+    var pages = (!isFullscreen && state.pageSize > 0)
+      ? Math.max(1, Math.ceil(ordered.length / state.pageSize))
+      : 1;
+    $("page-info").textContent = isFullscreen
+      ? "All " + totalRows + (totalRows === 1 ? " row" : " rows")
+      : "Page " + state.page + " of " + pages;
+    $("prev").disabled = isFullscreen || state.page <= 1;
+    $("next").disabled = isFullscreen || state.page >= pages;
   }
 
   function render() {
@@ -599,7 +758,44 @@
 
   /* ---------------- wiring ---------------- */
 
+  /* ---------------- theme (Light / Dark) ---------------- */
+
+  function currentTheme() {
+    return document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+  }
+
+  function setTheme(theme) {
+    document.documentElement.setAttribute("data-theme", theme);
+    try { localStorage.setItem("opsKpiTheme", theme); } catch (e) { /* storage blocked: still works this session */ }
+    var btns = document.querySelectorAll("#theme-switch button");
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].setAttribute("aria-pressed", btns[i].getAttribute("data-theme") === theme ? "true" : "false");
+    }
+  }
+
+  function buildThemeSwitch() {
+    if ($("theme-switch")) return;
+    var wrap = document.createElement("div");
+    wrap.id = "theme-switch";
+    wrap.className = "theme-switch";
+    wrap.setAttribute("role", "group");
+    wrap.setAttribute("aria-label", "Colour theme");
+    ["light", "dark"].forEach(function (t) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.setAttribute("data-theme", t);
+      b.textContent = t === "light" ? "Light" : "Dark";
+      b.addEventListener("click", function () { setTheme(t); });
+      wrap.appendChild(b);
+    });
+    var host = document.querySelector(".head");
+    if (host) host.appendChild(wrap);
+    else { wrap.classList.add("is-floating"); document.body.appendChild(wrap); }
+    setTheme(currentTheme());
+  }
+
   function bind() {
+    buildThemeSwitch();
     var searchTimer;
     $("search").addEventListener("input", function (e) {
       clearTimeout(searchTimer);
@@ -627,11 +823,15 @@
     $("prev").addEventListener("click", function () { state.page--; render(); });
     $("next").addEventListener("click", function () { state.page++; render(); });
 
+    // Full screen bypasses pagination entirely (see renderTable) and
+    // shows every filtered row grouped by SPoC -- no row-count math
+    // needed here, just toggle the class and re-render.
     $("fullscreen-toggle").addEventListener("click", function () {
       var block = document.querySelector(".table-block");
       var isFull = block.classList.toggle("is-fullscreen");
       document.body.classList.toggle("has-fullscreen-table", isFull);
       this.textContent = isFull ? "Exit full screen" : "Full screen";
+      render();
     });
     document.addEventListener("keydown", function (e) {
       var block = document.querySelector(".table-block");
@@ -639,8 +839,10 @@
         block.classList.remove("is-fullscreen");
         document.body.classList.remove("has-fullscreen-table");
         $("fullscreen-toggle").textContent = "Full screen";
+        render();
       }
     });
+
 
     function clearFilters() {
       state.search = ""; state.spoc = ""; state.rowType = "all";
@@ -674,12 +876,33 @@
 
     // drop any report that arrived malformed rather than failing the whole page
     var clean = {};
-    keys.forEach(function (k) { clean[k] = payload.reports[k]; });
+    keys.forEach(function (k) { clean[k] = payload.reports[k]; clean[k]._key = k; });
     payload.reports = clean;
     payload.metadata.report_order = (payload.metadata.report_order || keys)
       .filter(function (k) { return clean[k]; });
     if (!payload.metadata.report_order.length) payload.metadata.report_order = keys;
     return null;
+  }
+
+  /* D-2 reporting rule: the single most recent DAY period (period
+     index 1 -- what the source SQL already treats as "yesterday") is
+     never shown in the dashboard; the latest displayed/selectable day
+     is always the one before it. This is a pure display trim done
+     once at load time: the dropped period's column is removed from
+     each report's column list (so no table header/cell, no date
+     chip, no summary card can ever reference it), but the row data
+     itself and week/month periods are untouched -- nothing is deleted
+     from the JSON, only what the UI iterates over. Entirely
+     index-based, so no date is ever hardcoded: whichever day the
+     source data considers freshest is always the one dropped. */
+  function applyD2Cutoff(payload) {
+    Object.keys(payload.reports || {}).forEach(function (key) {
+      var rep = payload.reports[key];
+      var days = rep.periods && rep.periods.day;
+      if (!days || days.length < 2) return; // nothing left to fall back to
+      var dropped = days.shift();
+      rep.columns = rep.columns.filter(function (c) { return c.key !== dropped.key; });
+    });
   }
 
   function load() {
@@ -695,6 +918,7 @@
         var problem = checkPayload(payload);
         if (problem) { showError(problem); return; }
 
+        applyD2Cutoff(payload);
         state.payload = payload;
         var order = payload.metadata.report_order;
         $("loading").hidden = true;
