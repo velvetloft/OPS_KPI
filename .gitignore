@@ -5,6 +5,7 @@
 
 # Generated KPI data
 data/*.json
+!data/ops_kpi_data.json
 .ops_kpi_data_*.json.tmp
 
 # Excel output
