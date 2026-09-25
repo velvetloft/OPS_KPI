@@ -168,7 +168,7 @@ reports = [
         "target_column": "target_abv",
         "achievement_basis": None,
         "folder": "abv",
-        "file": "abv_22_sep.xlsx",
+        "file": "abv_25_sep.xlsx",
         "query": f"""
         WITH store_spoc AS (
     -- Authoritative store universe: every store with a SPOC/target
@@ -640,7 +640,7 @@ ORDER BY
         "target_column": "target_upt",
         "achievement_basis": None,
         "folder": "upt",
-        "file": "upt_22_sep.xlsx",
+        "file": "upt_25_sep.xlsx",
         "query": f"""
     WITH store_spoc AS (
     SELECT DISTINCT
@@ -1095,7 +1095,7 @@ ORDER BY
         "target_column": None,
         "achievement_basis": None,
         "folder": "sales",
-        "file": "sales_22_sep.xlsx",
+        "file": "sales_25_sep.xlsx",
         "query": f"""
         WITH store_spoc AS (
     SELECT DISTINCT
@@ -1345,7 +1345,7 @@ ORDER BY
         "target_column": None,
         "achievement_basis": None,
         "folder": "noh",
-        "file": "noh_22_sep.xlsx",
+        "file": "noh_25_sep.xlsx",
         "query": f"""
 WITH store_spoc AS (
     SELECT DISTINCT
@@ -1601,7 +1601,7 @@ ORDER BY
         "target_column": None,
         "achievement_basis": 100,
         "folder": "sales_ach",
-        "file": "sales_ach_22_sep.xlsx",
+        "file": "sales_ach_25_sep.xlsx",
         "query": f"""
          WITH store_spoc AS (
     SELECT DISTINCT
